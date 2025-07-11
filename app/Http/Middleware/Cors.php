@@ -9,16 +9,23 @@ class Cors
 {
     public function handle(Request $request, Closure $next)
     {
-        $response = $next($request);
-
-        $allowedOrigins = explode(',', env('CORS_ALLOWED_ORIGINS', ''));
+        $allowedOrigins = array_filter(explode(',', env('CORS_ALLOWED_ORIGINS', '')));
         $origin = $request->header('Origin');
 
-        if (in_array($origin, $allowedOrigins) || empty($allowedOrigins)) {
-            $response->headers->set('Access-Control-Allow-Origin', $origin ?: '*');
+        // Manejar solicitudes preflight (OPTIONS)
+        if ($request->isMethod('OPTIONS')) {
+            $response = response('', 200);
+        } else {
+            $response = $next($request);
+        }
+
+        // Establecer headers CORS
+        if (in_array($origin, $allowedOrigins)) {
+            $response->headers->set('Access-Control-Allow-Origin', $origin);
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-TOKEN');
             $response->headers->set('Access-Control-Allow-Credentials', 'true');
+            $response->headers->set('Vary', 'Origin');
         }
 
         return $response;

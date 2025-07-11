@@ -3,12 +3,14 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
-        apiPrefix: 'api', // Asegura que las rutas usen el prefijo /api 
+        apiPrefix: 'api',
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
@@ -22,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
-        $middleware->api(append: [
+        $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \App\Http\Middleware\Cors::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
@@ -41,5 +43,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (ModelNotFoundException $e, $request) {
+            return response()->json(['error' => 'Recurso no encontrado.'], 404);
+        });
+
+        $exceptions->render(function (HttpException $e, $request) {
+            return response()->json(['error' => $e->getMessage()], $e->getStatusCode());
+        });
+
+        $exceptions->render(function (\Exception $e, $request) {
+            return response()->json([
+                'error' => 'Error interno del servidor.',
+                'message' => env('APP_DEBUG', false) ? $e->getMessage() : 'Contacta al administrador.',
+            ], 500);
+        });
     })->create();
