@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -58,8 +59,26 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        try {
+            $user = $request->user();
+            if (!$user) {
+                return response()->json(['error' => 'Usuario no autenticado'], 401);
+            }
 
-        return response()->json(['message' => 'Logged out successfully'], 200);
+            // Revocar todos los tokens del usuario
+            $user->tokens()->delete();
+
+            // Invalidar la sesión actual
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json(['message' => 'Logged out successfully'], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error en logout: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Error interno del servidor.',
+                'message' => env('APP_DEBUG', false) ? $e->getMessage() : 'Contacta al administrador.',
+            ], 500);
+        }
     }
 }
